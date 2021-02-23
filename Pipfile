@@ -1,0 +1,42 @@
+[[source]]
+url = "https://pypi.python.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[scripts]
+tests = "pytest -x -c src/pytest.ini"
+agent = "python3 gateway"
+[requires]
+python_version = "3.8"
+
+[packages]
+wheel = "*"
+pycryptodomex = "*"
+websockets = "*"
+tldextract = "*"
+pyinstaller = "*"
+redis = "*"
+dnspython = "*"
+crossplane = "*"
+
+[dev-packages]
+pytest = "*"
+mixer = "*"
+pylint = "*"
+pytest-vcr = "*"
+pytest-mock = "*"
+pytest-xdist = "*"
+pytest-cov = "*"
+codecov = "*"
+tox = "*"
+pycodestyle = "*"
+pydocstyle = "*"
+isort = "*"
+yapf = "*"
+pylint-plugin-utils = "*"
+factory-boy = "*"
+coverage = "*"
+coreapi-cli = "*"
+pytest-ordering = "*"
+faker = "*"
+pydevd = "*"
