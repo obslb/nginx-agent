@@ -5,7 +5,7 @@ import sys
 import traceback
 import ssl
 import websockets
-from websockets import WebSocketClientProtocol
+from websockets import WebSocketClientProtocol, InvalidStatusCode
 
 logger = logging.getLogger('agent')
 
@@ -57,6 +57,10 @@ class GateWayAgent:
             except IOError as error:
                 # disconnected from server mis-transfer
                 logger.warning(f'{self} Error, disconnected from server mis-transfer: {error}')
+
+            except InvalidStatusCode as error:
+                logger.warning(f'{self} Error, rejected from server: {error}')
+                await asyncio.sleep(60)
 
             except Exception as error:
                 logger.warning(f'{self} Error, unexpected exception: {error}')

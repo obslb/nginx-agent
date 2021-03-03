@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-sudo apt update && apt dist-upgrade -y
+apt update && apt install -y git && apt autoremove --purge -y apache2 && apt dist-upgrade -y
 
 sudo apt install -y nginx letsencrypt python3-pip pipenv redis-server && pipenv install --deploy --system
 
