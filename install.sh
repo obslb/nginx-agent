@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
-apt update && apt install -y git && apt autoremove --purge -y apache2 && apt dist-upgrade -y
+sudo apt update && apt install -y git python3.8 python3.8-dev python3.8-venv && apt autoremove --purge -y apache2 && apt dist-upgrade -y
 
-sudo apt install -y nginx letsencrypt python3-pip pipenv redis-server && pipenv install --deploy --system
+sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 2
+
+sudo python3.8 -m easy_install pip
+
+
+sudo apt install -y nginx letsencrypt redis-server && pipenv install --deploy --system
 
 mkdir -p /etc/nginx-agent/
 

@@ -24,7 +24,7 @@ Restart=always
 User=root
 Group=root
 WorkingDirectory=/srv/nginx-agent/
-ExecStart=python3 nginx-agent.py run --debug --connect_url "wss://cpanel.mydomain.com/websocket/vps/agents/" --connect_token "SUPERSECRET_TOKEN"
+ExecStart=/usr/bin/python3.8 nginx-agent.py run --debug --connect_url "wss://cpanel.mydomain.com/websocket/vps/agents/" --connect_token "SUPERSECRET_TOKEN"
 
 [Install]
 WantedBy=multi-user.target

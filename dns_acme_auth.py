@@ -147,9 +147,9 @@ class Storage:
             return None
 
     def get_cache(self, key: str):
-        if value := self.cache.get(key):
-            return pickle.loads(value)
-        raise ValueError(f"Object {key} are not exists in cache.")
+        if self.cache.get(key):
+            return pickle.loads(self.cache.get(key))
+        raise ValueError("Object {} are not exists in cache.".format(key))
 
     def set_cache(self, key, value, ex=None):
         return self.cache.set(key, pickle.dumps(value), ex)
