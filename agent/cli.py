@@ -90,7 +90,7 @@ Restart=always
 RestartSec=5
 User=root
 Group=root
-WorkingDirectory=/opt/ilos/
+WorkingDirectory=/srv/
 ExecStart=/usr/bin/python3 ./src/manage.py runserver 0.0.0.0:8000
 
 [Install]
@@ -167,12 +167,6 @@ server {{
         default_gen_common_restricted_path = os.path.join(self.config_dir, "common", self.default_restricted_config)
         if not os.path.exists(default_gen_common_restricted_path) or self.reconfigure:
             template = """
-location /admin/ {
-    return 404; #return the code 404
-}
-location /api/ {
-    return 404; #return the code 404
-}
 location / {
     proxy_redirect off;
     proxy_pass https://backend;
