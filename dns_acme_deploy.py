@@ -2,6 +2,7 @@
 import os
 import subprocess
 import sys
+import time
 
 WORK_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -19,6 +20,7 @@ DEFAULT_NGINX_WORK_DIR = "/etc/nginx/"
 
 
 def reload_nginx():
+    time.sleep(2)
     try:
         subprocess.check_output(f"sudo /usr/sbin/nginx -s reload", stderr=subprocess.STDOUT, shell=True)
     except Exception as exc:
