@@ -35,7 +35,7 @@ class GateWayAgent:
     async def websocket_connection(self):
         while not self.finished:
             try:
-                self.websocket = await websockets.client.connect(self.connect_url,
+                self.websocket = await websockets.connect(self.connect_url,
                                                                  max_size=None,
                                                                  extra_headers=self.extra_headers,
                                                                  ssl=ssl.SSLContext(),
@@ -46,7 +46,7 @@ class GateWayAgent:
                                                    return_when=asyncio.FIRST_COMPLETED, )
                 for task in pending:
                     task.cancel()
-            except websockets.exceptions.ConnectionClosed as error:
+            except websockets.ConnectionClosed as error:
                 # disconnected from server
                 logger.warning(f'{self} Error, disconnected from server: {error}')
 
