@@ -6,6 +6,7 @@ name = "pypi"
 [scripts]
 tests = "pytest -x -c src/pytest.ini"
 agent = "python3 gateway"
+
 [requires]
 python_version = "3.8"
 
@@ -18,6 +19,7 @@ pyinstaller = "*"
 redis = "*"
 dnspython = "*"
 crossplane = "*"
+jinja2 = "*"
 
 [dev-packages]
 pytest = "*"

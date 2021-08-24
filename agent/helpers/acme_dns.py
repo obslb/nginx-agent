@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+# https://www.digitalocean.com/community/tutorials/how-to-acquire-a-let-s-encrypt-certificate-using-dns-validation-with-acme-dns-certbot-on-ubuntu-18-04
 import json
 import os
 import pickle
@@ -8,18 +8,10 @@ import time
 import redis
 import requests
 
-WORK_DIR = os.path.dirname(os.path.abspath(__file__))
-
-BASE_DIR = os.path.join(WORK_DIR, 'agent')
-if not os.path.exists(BASE_DIR):
-    raise Exception('Error, we could not find path with gateway: {0}!!'.format(BASE_DIR))
-sys.path.append(BASE_DIR)
-
-# https://www.digitalocean.com/community/tutorials/how-to-acquire-a-let-s-encrypt-certificate-using-dns-validation-with-acme-dns-certbot-on-ubuntu-18-04
-
 # URL to acme-dns instance
 ACME_DNS_URL = "https://auth.acme-dns.io"
 # Path for acme-dns credential storage
+ACCOUNTS_STORAGE = '/etc/letsencrypt/'
 
 ALLOW_FROM = []
 # Force re-registration. Overwrites the already existing acme-dns accounts.
@@ -30,12 +22,6 @@ if DOMAIN.startswith("*."):
     DOMAIN = DOMAIN[2:]
 VALIDATION_DOMAIN = "_acme-challenge." + DOMAIN
 VALIDATION_TOKEN = os.environ["CERTBOT_VALIDATION"]
-
-# TODO CHANGE ACME_TIME_OUT FOR PRODUCTION
-
-TEMP_FOLDER = '/tmp'
-ACCOUNTS_STORAGE = '/etc/letsencrypt/'
-DOMAIN_TMP_TOKENS = os.path.join(TEMP_FOLDER, DOMAIN + ".lock")
 
 
 class AcmeDnsClient(object):
@@ -101,19 +87,19 @@ class Storage:
     def load(self):
         """Reads the storage content from the disk to a dict structure"""
         data = dict()
-        filedata = ""
+        file_data = ""
         try:
             with open(self.storage_path, 'r') as fh:
-                filedata = fh.read()
+                file_data = fh.read()
         except IOError as e:
             if os.path.isfile(self.storage_path):
                 # Only error out if file exists, but cannot be read
                 print("ERROR: Storage file exists but cannot be read")
                 sys.exit(1)
         try:
-            data = json.loads(filedata)
+            data = json.loads(file_data)
         except ValueError:
-            if len(filedata) > 0:
+            if len(file_data) > 0:
                 # Storage file is corrupted
                 print("ERROR: Storage JSON is corrupted")
                 sys.exit(1)
@@ -155,7 +141,7 @@ class Storage:
         return self.cache.set(key, pickle.dumps(value), ex)
 
 
-def main():
+def run_check(**kwargs):
     client = AcmeDnsClient(ACME_DNS_URL)
     domain_account_path = os.path.join(ACCOUNTS_STORAGE, DOMAIN + ".json")
     storage = Storage(domain_account_path)
@@ -178,18 +164,14 @@ def main():
     client.update_txt_record(account, VALIDATION_TOKEN)
 
     instance = storage.get_cache(DOMAIN)
+    # we need set accounts details and token details
+    # and wait for confirm of dns or timeout
     instance.set_account(account)
     instance.set_token(VALIDATION_TOKEN)
     storage.set_cache(DOMAIN, instance, instance.cache_time_out)
 
-    # we need set accounts details and token details
-    # and wait for confirm of dns or timeout
     if instance.token_one and instance.token_two:
+        # we need set pending toggle and wait for item
         while not instance.continue_check:
             time.sleep(5)
             instance = storage.get_cache(DOMAIN)
-
-
-if __name__ == "__main__":
-    # Init
-    main()

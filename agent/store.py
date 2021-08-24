@@ -1,22 +1,37 @@
 import asyncio
 import pickle
 import redis
+import time
 
 
-class Store:
+class Singleton(type):
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
+        return cls._instances[cls]
+
+
+class Store(metaclass=Singleton):
     connect_url = ""
     connect_token = ""
     tmp = '/tmp/'
     nginx_path = '/etc/nginx/'
     letsencrypt_path = '/etc/letsencrypt/'
     config_path = '/etc/nginx-agent/'
+    debug = False
+    environment = 'production'
 
     def __init__(self, **kwargs):
+        self.start_time = time.time()
+
         self.cache = redis.Redis(host='localhost', port=6379, db=0)
         self.cache.flushall()
 
         self.receive_queue = asyncio.Queue()
         self.producer_queue = asyncio.Queue()
+
         for k, v in kwargs.items():
             if hasattr(self, k) and v:
                 setattr(self, k, v)

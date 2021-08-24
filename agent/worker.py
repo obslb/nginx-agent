@@ -1,7 +1,14 @@
 import asyncio
+import json
 import logging
 import os
-from typing import Dict, Tuple
+import ssl
+import sys
+import time
+import traceback
+import typing
+
+import websockets
 
 from models import Domain, PENDING, SUCCESS, FAILED
 from store import Store
@@ -9,12 +16,111 @@ from store import Store
 logger = logging.getLogger('agent')
 
 
-class Worker:
-    consumer_name = 'agent.worker'
+class Connector:
+    websocket: websockets.WebSocketClientProtocol = None
+    receive_queue: asyncio.Queue
+    producer_queue: asyncio.Queue
 
-    def __init__(self, loop, store: Store):
+    def __init__(self, store):
+        self.receive_queue = store.receive_queue
+        self.producer_queue = store.producer_queue
+        self.finished = False
+        self.connect_url = store.connect_url
+        self.extra_headers = {"TOKEN": store.connect_token}
 
-        self.loop = loop
+    @classmethod
+    async def decode_json(cls, text_data):
+        return json.loads(text_data)
+
+    @classmethod
+    async def encode_json(cls, content):
+        return json.dumps(content)
+
+    async def websocket_connection(self):
+        while not self.finished:
+            try:
+                self.websocket = await websockets.connect(self.connect_url,
+                                                          max_size=None,
+                                                          extra_headers=self.extra_headers,
+                                                          ssl=ssl.SSLContext(),
+                                                          )
+                consumer_task = asyncio.create_task(self.receive())
+                producer_task = asyncio.create_task(self.producer())
+                done, pending = await asyncio.wait([consumer_task, producer_task],
+                                                   return_when=asyncio.FIRST_COMPLETED, )
+                for task in pending:
+                    task.cancel()
+            except websockets.ConnectionClosed as error:
+                # disconnected from server
+                logger.warning(f'{self} Error, disconnected from server: {error}')
+
+            except BrokenPipeError as error:
+                # Connect failed
+                logger.warning(f'{self} Error, Connect failed: {error}')
+
+            except IOError as error:
+                # disconnected from server mis-transfer
+                logger.warning(f'{self} Error, disconnected from server mis-transfer: {error}')
+
+            except websockets.InvalidStatusCode as error:
+                logger.warning(f'{self} Error, rejected from server: {error}')
+                await asyncio.sleep(60)
+
+            except Exception as error:
+                logger.warning(f'{self} Error, unexpected exception: {error}')
+                traceback.print_exc(file=sys.stdout)
+
+    async def receive(self):
+        try:
+            async for message in self.websocket:
+                if isinstance(message, str):
+                    await self.receive_json(await self.decode_json(message))
+                else:
+                    raise ValueError("No text section for incoming WebSocket frame!")
+        except asyncio.CancelledError:
+            logger.info(f"websocket receive task shutting down.")
+
+    async def receive_json(self, data, **kwargs):
+        try:
+            logger.debug(f'{self}::receive_json: {data}')
+            await self.receive_queue.put(data)
+        except Exception as error:
+            logger.debug(f'{self}::receive_json: Exception, {error}')
+
+    async def send_json(self, content, **kwargs):
+        await self.websocket.send(await self.encode_json(content))
+
+    async def producer(self):
+        try:
+            logger.debug("Websocket Producer Loop Started")
+            while not self.finished:
+                pong_waiter = await self.websocket.ping()
+                await pong_waiter
+                try:
+                    event = await self.producer_queue.get()
+                    # this will break Loop and return to WS setup block
+                    if event is None:
+                        break
+
+                    logger.debug(f"{self}, send_json {event}")
+                    await self.send_json(event)
+                except asyncio.QueueEmpty as exc:
+                    pass
+                except Exception as exc:
+                    # logger.debug(f'{self}::producer_handler: Exception, {error}')
+                    pass
+        except asyncio.CancelledError:
+            logger.info(f"websocket producer task shutting down.")
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}>"
+
+
+class Worker(Connector):
+
+    def __init__(self, store: Store):
+        super().__init__(store)
+
         self.finished = False
         self.config_path = store.config_path
         self.letsencrypt_path: str = store.letsencrypt_path
@@ -24,16 +130,35 @@ class Worker:
         self.dns_acme_clean = os.path.join(self.config_path, "dns_acme_clean.py")
         self.dns_acme_deploy = os.path.join(self.config_path, "dns_acme_deploy.py")
 
-    def get_or_create_domain(self, domain: str) -> Tuple[Domain, bool]:
+    def get_or_create_domain(self, domain: str, cache_ttl=None, **kwargs) -> typing.Tuple[Domain, bool]:
         # we need create redis cache
         try:
             return self.store.get_cache(domain), False
         except ValueError as exc:
-            instance = Domain(domain)
+            instance = Domain(domain, cache_ttl=cache_ttl)
             self.store.set_cache(domain, instance, instance.cache_time_out)
             return instance, True
 
-    async def periodical_check(self, instance: Domain):
+
+
+    async def dispatch(self, message: typing.Dict):
+        try:
+            action = message.get("action")
+            if action == "add_domain":
+                domain = message['content']['domain'].strip()
+                cache_ttl = int(message['content']['cache_ttl'])
+                if domain:
+                    # we need register 2 new tasks in loop
+                    instance, is_created = self.get_or_create_domain(domain, cache_ttl)
+                    if is_created:
+                        asyncio.create_task(self.create_letsencrypt_task(instance))
+                        asyncio.create_task(self.create_dns_check_task(instance))
+        except Exception as exc:
+            logger.exception(exc)
+
+
+    # user create tasks
+    async def create_dns_check_task(self, instance: Domain):
         try:
             domain: str = instance.domain
             while instance.status in [PENDING]:
@@ -46,17 +171,16 @@ class Worker:
 
                 if instance.continue_check:
                     acme_time = int(instance.current_time - instance.start_time)
-                    if acme_time >= 60 * 11:
+                    if acme_time >= instance.cache_time_out:
                         instance.status = FAILED
                         instance.on_error = "Session and confirmation timeout."
 
                 self.store.set_cache(domain, instance, instance.cache_time_out)
                 await self.store.producer_queue.put(
                     {
-                        "consumer": "remote.vps.agent",
-                        "type": "receive.json",
-                        "action": f"acme_{PENDING}",
-                        "message": instance.serialize()
+                        "type": "client.forward.message",
+                        "ftype": f"acme_{PENDING}",
+                        "content": instance.serialize()
                     }
                 )
 
@@ -65,22 +189,21 @@ class Worker:
             if instance.status == SUCCESS:
                 await self.store.producer_queue.put(
                     {
-                        "consumer": "remote.vps.agent",
-                        "type": "receive.json",
-                        "action": f"acme_{SUCCESS}",
+                        "type": "client.forward.message",
+                        "ftype": f"acme_{SUCCESS}",         # ftype = acme_success
                         "error": [],
-                        "message": instance.serialize()
+                        "content": instance.serialize()
+
                     }
                 )
                 self.store.cache.delete(domain)
             else:
                 await self.store.producer_queue.put(
                     {
-                        "consumer": "remote.vps.agent",
-                        "type": "receive.json",
-                        "action": f"acme_{FAILED}",
+                        "type": "client.forward.message",
+                        "ftype": f"acme_{FAILED}",
                         "error": [],
-                        "message": instance.serialize()
+                        "content": instance.serialize()
                     }
                 )
                 self.store.cache.delete(domain)
@@ -88,7 +211,15 @@ class Worker:
         except Exception as exc:
             logger.exception(exc)
 
-    async def letsencrypt_fork(self, instance: Domain):
+    async def create_letsencrypt_task(self, instance: Domain):
+        # if self.store.debug:
+        #     start = time.time()
+        #     current = time.time()
+        #     # emulate letsencrypt process and start while loop for 40 sec
+        #     while int(current - start) < 40:
+        #         current = time.time()
+        #         await asyncio.sleep(1)
+
         domain: str = instance.domain
 
         command = [
@@ -97,9 +228,9 @@ class Worker:
             f'--cert-name "{domain}"',
             '--manual',
             # f'--manual-auth-hook {self.dns_acme_auth}',
-            f'--manual-auth-hook ./dns_acme_auth.py',
+            f'--manual-auth-hook "./nginx-agent.py auth"',
             # f'--deploy-hook {self.dns_acme_deploy}',
-            f'--deploy-hook ./dns_acme_deploy.py',
+            f'--deploy-hook "./nginx-agent.py deploy"',
             '--force-renewal',
             '--preferred-challenges=dns',
             '--register-unsafely-without-email',
@@ -133,24 +264,7 @@ class Worker:
             instance.status = FAILED
         self.store.set_cache(domain, instance, instance.cache_time_out)
 
-    async def dispatch(self, message: Dict):
-        try:
-            payload = message["content"]["payload"]
-            action = message["content"]["action"]
-            if action == "add_domain":
-                domain = payload.get("domain").strip()
-                instance, is_created = self.get_or_create_domain(domain)
-                if is_created:
-                    asyncio.create_task(self.letsencrypt_fork(instance))
-                    asyncio.create_task(self.periodical_check(instance))
-            logger.debug(f"{self}, dispatch {message}")
-
-        except Exception as exc:
-            logger.exception(exc)
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__}>"
-
+    # periodical tasks
     async def task_queue(self):
         try:
             while not self.finished:
@@ -167,16 +281,16 @@ class Worker:
             await self.store.receive_queue.put(None)
             logger.info(f"incoming queue shutting down.")
 
-    async def cache(self):
+    async def heartbeat(self):
         try:
             while True:
                 await asyncio.sleep(30)
                 try:
                     await self.store.producer_queue.put(
                         {
-                            "action": 'heartbeat',
-                            "data": {
-                                "is_active": True
+                            "type": 'heartbeat',
+                            "content": {
+                                "is_online": True
                             },
                         }
                     )
@@ -184,3 +298,6 @@ class Worker:
                     logger.exception(exc)
         except asyncio.CancelledError:
             logger.info(f"cache queue shutting down.")
+
+    def __repr__(self):
+        return f"<'{self.__class__.__name__}'>"

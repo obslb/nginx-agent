@@ -17,10 +17,13 @@ class Domain:
     continue_check = False
     cache_time_out = 60 * 11
 
-    def __init__(self, domain: str):
+    def __init__(self, domain: str, **kwargs):
         self.domain = domain
         self.status = PENDING
         self.account = {}
+        if cache_ttl:= kwargs.get("cache_ttl"):
+            self.continue_time_out = cache_ttl
+            self.cache_time_out = cache_ttl + 30
         self.resolver = dns.resolver.Resolver()
         self.resolver.nameservers = ['8.8.8.8', '8.8.8.4']
         self.start_time = time.time()
@@ -36,6 +39,7 @@ class Domain:
         self.account = account
 
     def serialize(self):
+        auto_check_in = (self.continue_time_out - int(self.current_time - self.start_time))
         return {
             "domain": self.domain,
             "status": self.status,
@@ -44,8 +48,7 @@ class Domain:
             "token_two": self.token_two,
             "on_error": self.on_error,
             "on_success": self.on_success,
-            "start_time": self.start_time,
-            "current_time": self.current_time,
+            "auto_check_in": auto_check_in,
             "continue_time_out": self.continue_time_out,
             "continue_check": self.continue_check,
         }

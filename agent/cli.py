@@ -3,6 +3,7 @@ import logging.handlers
 import os
 import subprocess
 import sys
+import typing
 
 logger = logging.getLogger('agent')
 
@@ -30,6 +31,12 @@ class CommonArguments:
             '--debug',
             action="store_true",
             default=False,
+            help='set debug, default:False, true are not recommended for production, this can leak private data.'
+        )
+        parser.add_argument(
+            '-e',
+            '--environment',
+            default='production',
             help='set debug, default:False, true are not recommended for production, this can leak private data.'
         )
         parser.add_argument(
@@ -323,7 +330,7 @@ class Bootstrap:
         if not hasattr(self, sub_command):
             print('Unrecognized command')
             self.parser.print_help()
-            exit(1)
+            sys.exit(1)
         # use dispatch pattern to invoke method with same name
         handler = getattr(self, sub_command)
         parser = argparse.ArgumentParser(description='Base setup Sub-Command')
@@ -355,7 +362,8 @@ class Bootstrap:
         args: argparse.Namespace = parser.parse_args(sys.argv[2:])
         self._install(args)
 
-    def command_run(self, parser: argparse.ArgumentParser = None):
+    @staticmethod
+    def command_run(parser: argparse.ArgumentParser = None):
         from main import main
         from store import Store
         argument_classes = [
@@ -365,3 +373,15 @@ class Bootstrap:
         args: argparse.Namespace = parser.parse_args(sys.argv[2:])
         store = Store(**vars(args))
         main(store)
+
+    def command_auth(self, parser: argparse.ArgumentParser = None):
+        from helpers.acme_dns import run_check
+        args: argparse.Namespace = parser.parse_args(sys.argv[2:])
+        arguments: typing.Dict = vars(args)
+        run_check()
+
+    def command_deploy(self, parser: argparse.ArgumentParser = None):
+        args: argparse.Namespace = parser.parse_args(sys.argv[2:])
+
+        arguments: typing.Dict = vars(args)
+        logger.debug('command_auth:', arguments)
