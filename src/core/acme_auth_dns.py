@@ -17,12 +17,6 @@ ALLOW_FROM = []
 # Force re-registration. Overwrites the already existing acme-dns accounts.
 FORCE_REGISTER = False
 
-DOMAIN = os.environ["CERTBOT_DOMAIN"]
-if DOMAIN.startswith("*."):
-    DOMAIN = DOMAIN[2:]
-VALIDATION_DOMAIN = "_acme-challenge." + DOMAIN
-VALIDATION_TOKEN = os.environ["CERTBOT_VALIDATION"]
-
 
 class AcmeDnsClient(object):
     """
@@ -79,8 +73,17 @@ class AcmeDnsClient(object):
 
 
 class Storage:
-    def __init__(self, storage_path):
-        self.cache = redis.Redis(host='localhost', port=6379, db=0)
+    def __init__(self, storage_path, **kwargs):
+        if v := kwargs.get("redis_host"):
+            redis_host = v
+        else:
+            redis_host = 'redis'
+
+        if v := kwargs.get("redis_port"):
+            redis_port = v
+        else:
+            redis_port = 6379
+        self.cache = redis.Redis(host=redis_host, port=redis_port, db=0)
         self.storage_path = storage_path
         self._data = self.load()
 
@@ -141,7 +144,13 @@ class Storage:
         return self.cache.set(key, pickle.dumps(value), ex)
 
 
-def run_check(**kwargs):
+def acme_auth_check(**kwargs):
+    DOMAIN = os.environ["CERTBOT_DOMAIN"]
+    if DOMAIN.startswith("*."):
+        DOMAIN = DOMAIN[2:]
+    # VALIDATION_DOMAIN = "_acme-challenge." + DOMAIN
+    VALIDATION_TOKEN = os.environ["CERTBOT_VALIDATION"]
+
     client = AcmeDnsClient(ACME_DNS_URL)
     domain_account_path = os.path.join(ACCOUNTS_STORAGE, DOMAIN + ".json")
     storage = Storage(domain_account_path)

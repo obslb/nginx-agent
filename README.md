@@ -1,4 +1,23 @@
-### Install
+### Commands
+
+- setup and install all dependencies;
+``` bash
+$ /usr/bin/nginx-agent setup --upstreams "" --connect_url "" --connect_token "" --reconfigure
+```
+
+- connect and run app;
+``` bash
+$ /usr/bin/nginx-agent run --debug --connect_url "" --connect_token ""
+```
+- letsecrypt manual-auth-hook;
+``` bash
+$ /usr/bin/nginx-agent acme_auth
+```
+- letsecrypt deploy-hook;
+``` bash
+$ /usr/bin/nginx-agent acme_deploy
+```
+
 
 - run install script, this will install all dependencies;
 ```text

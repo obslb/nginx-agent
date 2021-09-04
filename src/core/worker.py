@@ -1,23 +1,28 @@
 import asyncio
 import json
 import logging
-import os
 import ssl
 import sys
-import time
 import traceback
 import typing
 
-import websockets
+# prevent issue: ModuleNotFoundError: No module named 'websockets.exceptions'
+from websockets.exceptions import (
+    ConnectionClosed,
+    InvalidStatusCode,
 
-from models import Domain, PENDING, SUCCESS, FAILED
-from store import Store
+)
+# prevent issue: ModuleNotFoundError: No module named 'websockets.legacy'
+from websockets.legacy import client
+
+from core.models import Domain, PENDING, SUCCESS, FAILED
+from core.store import Store
 
 logger = logging.getLogger('agent')
 
 
 class Connector:
-    websocket: websockets.WebSocketClientProtocol = None
+    websocket = None
     receive_queue: asyncio.Queue
     producer_queue: asyncio.Queue
 
@@ -39,18 +44,18 @@ class Connector:
     async def websocket_connection(self):
         while not self.finished:
             try:
-                self.websocket = await websockets.connect(self.connect_url,
-                                                          max_size=None,
-                                                          extra_headers=self.extra_headers,
-                                                          ssl=ssl.SSLContext(),
-                                                          )
+                self.websocket = await client.connect(self.connect_url,
+                                                      max_size=None,
+                                                      extra_headers=self.extra_headers,
+                                                      ssl=ssl.SSLContext(),
+                                                      )
                 consumer_task = asyncio.create_task(self.receive())
                 producer_task = asyncio.create_task(self.producer())
                 done, pending = await asyncio.wait([consumer_task, producer_task],
                                                    return_when=asyncio.FIRST_COMPLETED, )
                 for task in pending:
                     task.cancel()
-            except websockets.ConnectionClosed as error:
+            except ConnectionClosed as error:
                 # disconnected from server
                 logger.warning(f'{self} Error, disconnected from server: {error}')
 
@@ -61,8 +66,9 @@ class Connector:
             except IOError as error:
                 # disconnected from server mis-transfer
                 logger.warning(f'{self} Error, disconnected from server mis-transfer: {error}')
+                await asyncio.sleep(5)
 
-            except websockets.InvalidStatusCode as error:
+            except InvalidStatusCode as error:
                 logger.warning(f'{self} Error, rejected from server: {error}')
                 await asyncio.sleep(60)
 
@@ -122,13 +128,7 @@ class Worker(Connector):
         super().__init__(store)
 
         self.finished = False
-        self.config_path = store.config_path
-        self.letsencrypt_path: str = store.letsencrypt_path
         self.store = store
-
-        self.dns_acme_auth = os.path.join(self.config_path, "dns_acme_auth.py")
-        self.dns_acme_clean = os.path.join(self.config_path, "dns_acme_clean.py")
-        self.dns_acme_deploy = os.path.join(self.config_path, "dns_acme_deploy.py")
 
     def get_or_create_domain(self, domain: str, cache_ttl=None, **kwargs) -> typing.Tuple[Domain, bool]:
         # we need create redis cache
@@ -138,8 +138,6 @@ class Worker(Connector):
             instance = Domain(domain, cache_ttl=cache_ttl)
             self.store.set_cache(domain, instance, instance.cache_time_out)
             return instance, True
-
-
 
     async def dispatch(self, message: typing.Dict):
         try:
@@ -156,9 +154,9 @@ class Worker(Connector):
         except Exception as exc:
             logger.exception(exc)
 
-
     # user create tasks
     async def create_dns_check_task(self, instance: Domain):
+
         try:
             domain: str = instance.domain
             while instance.status in [PENDING]:
@@ -185,12 +183,11 @@ class Worker(Connector):
                 )
 
             # this mean domains challenge Error or Success
-            # TODO add logic for this challenge
             if instance.status == SUCCESS:
                 await self.store.producer_queue.put(
                     {
                         "type": "client.forward.message",
-                        "ftype": f"acme_{SUCCESS}",         # ftype = acme_success
+                        "ftype": f"acme_{SUCCESS}",  # ftype = acme_success
                         "error": [],
                         "content": instance.serialize()
 
@@ -222,15 +219,21 @@ class Worker(Connector):
 
         domain: str = instance.domain
 
+        if self.store.environment == "production":
+            auth_hook = './nginx-agent.py acme_auth'
+            deploy_hook = './nginx-agent.py acme_deploy'
+        else:
+            # TODO: add local tests with some timeouts in development
+            auth_hook = './nginx-agent.py acme_auth'
+            deploy_hook = './nginx-agent.py acme_deploy'
+
         command = [
             'letsencrypt',
             'certonly',
             f'--cert-name "{domain}"',
             '--manual',
-            # f'--manual-auth-hook {self.dns_acme_auth}',
-            f'--manual-auth-hook "./nginx-agent.py auth"',
-            # f'--deploy-hook {self.dns_acme_deploy}',
-            f'--deploy-hook "./nginx-agent.py deploy"',
+            f'--manual-auth-hook "{auth_hook}"',
+            f'--deploy-hook "{deploy_hook}"',
             '--force-renewal',
             '--preferred-challenges=dns',
             '--register-unsafely-without-email',
@@ -290,7 +293,7 @@ class Worker(Connector):
                         {
                             "type": 'heartbeat',
                             "content": {
-                                "is_online": True
+                                "is_online": True,
                             },
                         }
                     )
