@@ -26,3 +26,5 @@ mkdir -p /srv/data/nginx \
 # example: ./install.sh '["mydomain.com"]' 'wss://mydomain.com/websocket/vps/' '123example456'
 
 printf "UPSTREAMS=$1\nCONNECT_URL=$2\nCONNECT_TOKEN=$3" > .env
+
+docker-compose up -d --build
