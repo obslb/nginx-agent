@@ -41,7 +41,7 @@ RUN chmod +x /start.sh
 
 # Copy the entrypoint that will generate Nginx additional configs
 COPY  docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x / docker-entrypoint.sh.sh
+RUN chmod +x / docker-entrypoint.sh
 
 
 WORKDIR /app
