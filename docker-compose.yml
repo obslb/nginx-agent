@@ -32,14 +32,3 @@ services:
     restart: always
     image: redis:latest
     hostname: redis
-
-  dante:
-    image: adegtyarev/dante
-    command: sockd-username
-    environment:
-      SOCKD_USER_NAME: $SOCKD_USER_NAME
-      SOCKD_USER_PASSWORD: $SOCKD_USER_PASSWORD
-    ports:
-      - "1080:1080"
-    volumes:
-      - ./sockd.conf:/etc/sockd.conf
