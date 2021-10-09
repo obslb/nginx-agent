@@ -186,7 +186,7 @@ class Worker(Connector):
                         "consumer": "remote.vps.agent",
                         "type": "receive.json",
                         "action": f"acme_{PENDING}",
-                        "content": instance.serialize()
+                        "message": instance.serialize()
                     }
                 )
 
@@ -199,7 +199,7 @@ class Worker(Connector):
                         "type": "receive.json",
                         "action": f"acme_{SUCCESS}",
                         "error": [],
-                        "content": instance.serialize()
+                        "message": instance.serialize()
 
                     }
                 )
@@ -212,7 +212,7 @@ class Worker(Connector):
                         "type": "receive.json",
                         "action": f"acme_{FAILED}",
                         "error": [],
-                        "content": instance.serialize()
+                        "message": instance.serialize()
                     }
                 )
                 self.store.cache.delete(domain)
