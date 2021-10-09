@@ -288,7 +288,7 @@ class Bootstrap:
 
         agent.setup(
             upstreams=args.upstreams,
-            connect_url=args.connect_url,
+            connect_urls=args.connect_urls,
             connect_token=args.connect_token,
         )
 
@@ -330,7 +330,7 @@ class Bootstrap:
             if not upstreams:
                 upstreams = json.loads(os.environ['agent_upstreams'])
 
-            connect_urls: str = args.connect_url
+            connect_urls: str = args.connect_urls
             if not connect_urls:
                 connect_urls = os.environ.get('agent_connect_urls')
 
