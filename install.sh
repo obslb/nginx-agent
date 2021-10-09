@@ -1,15 +1,35 @@
 #!/usr/bin/env bash
-export LANG=en_US.UTF-8
 
-sudo apt update && apt install -y git python3.8 python3.8-dev python3.8-venv && apt autoremove --purge -y apache2 && apt dist-upgrade -y
+# https://docs.docker.com/engine/install/ubuntu/
+sudo apt update && apt dist-upgrade -y && sudo apt install -y \
+    apt-transport-https \
+    ca-certificates \
+    curl \
+    gnupg \
+    lsb-release && apt autoremove --purge -y apache2 nginx
 
-sudo locale-gen en_US.UTF-8
-#sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 2
-#sudo python3.8 -m easy_install pip
-sudo apt install -y nginx letsencrypt redis-server && pipenv install --deploy --system
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
 
-mkdir -p /etc/nginx-agent/
+echo \
+  "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
+  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-cp -rf dns_acme_auth.py /etc/nginx-agent/
-cp -rf dns_acme_clean.py /etc/nginx-agent/
-cp -rf dns_acme_deploy.py /etc/nginx-agent/
+sudo apt update && sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose
+
+# create shared volume data directory for containers
+mkdir -p /srv/data/nginx \
+      && mkdir -p /etc/letsencrypt/ \
+      && touch /srv/data/nginx/nginx.conf \
+      && chmod -R 1000 /srv/data/ \
+      && chmod -R 1000 /etc/letsencrypt/
+
+# example: ./install.sh '["mydomain.com"]' '["wss://mydomain.com/websocket/vps/"]' '123example456'
+
+printf "UPSTREAMS=$1\nCONNECT_URLS=$2\nCONNECT_TOKEN=$3\nSOCKD_USER_NAME=$4\nSOCKD_USER_PASSWORD=$5\n" > .env
+
+# TODO: change to single base64 string in v2.1.x
+#decrypted=$(echo "$1" | openssl enc -d -base64)
+#IFS=' ' read UPSTREAMS CONNECT_URLS CONNECT_TOKEN <<< $decrypted
+#printf "UPSTREAMS=$UPSTREAMS\nCONNECT_URLS=$CONNECT_URLS\nCONNECT_TOKEN=$CONNECT_TOKEN" #> .env
+
+docker-compose up -d --build

@@ -1,0 +1,14 @@
+# cat /etc/nginx/config/sites-enabled/default
+server {
+        listen 80 default_server;
+        listen 443 ssl default_server;
+        access_log on;
+
+        access_log  /var/log/nginx/default_access.log main;
+        error_log  /var/log/nginx/default_error.log;
+
+        server_name _;
+        ssl_certificate {{ssl_certificate}};
+        ssl_certificate_key {{ssl_certificate_key}};
+        return 444;
+}
