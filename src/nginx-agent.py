@@ -240,6 +240,19 @@ class CommonArguments:
             help='',
         )
 
+        parser.add_argument(
+            '--redis-host',
+            default=None,
+            required=False,
+            help='',
+        )
+        parser.add_argument(
+            '--redis-port',
+            default=None,
+            required=False,
+            help='',
+        )
+
 
 class Bootstrap:
     usage = """
@@ -332,7 +345,7 @@ class Bootstrap:
 
             connect_urls: str = args.connect_urls
             if not connect_urls:
-                connect_urls = os.environ.get('agent_connect_urls')
+                connect_urls = json.loads(os.environ.get('agent_connect_urls'))
 
             connect_token: str = args.connect_token
             if not connect_token:
