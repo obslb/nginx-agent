@@ -17,13 +17,13 @@ ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 ENV PIP_NO_CACHE_DIR 0
 
-RUN set -ex &&  pip3 install --no-cache-dir --upgrade pip pipenv watchdog && mkdir -p /app
+RUN set -ex &&  pip3 install --no-cache-dir --upgrade pip pycryptodomex websockets watchdog tldextract redis dnspython jinja2&& mkdir -p /app
 
 WORKDIR /app
-# -- Adding Pipfiles
-ONBUILD COPY src/Pipfile Pipfile
-ONBUILD COPY src/Pipfile.lock Pipfile.lock
-ONBUILD RUN set -ex && pipenv install --deploy --system
+## -- Adding Pipfiles
+#ONBUILD COPY src/Pipfile Pipfile
+#ONBUILD COPY src/Pipfile.lock Pipfile.lock
+#ONBUILD RUN set -ex && pipenv install --deploy --system
 
 
 ### create the runtime image ###
