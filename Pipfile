@@ -7,7 +7,7 @@ name = "pypi"
 tests = "pytest -x -c src/pytest.ini"
 
 [requires]
-python_version = "3.8"
+python_version = "3.10.4"
 
 [packages]
 wheel = "*"

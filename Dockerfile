@@ -1,6 +1,6 @@
 # this is nginx with automatical monitoring if conf.d has been changed and auto master restart
 # Pull base image
-FROM python:3.8-buster as build-system
+FROM python:3.10.4-buster as build-system
 COPY install-nginx-debian.sh /
 RUN bash /install-nginx-debian.sh
 
