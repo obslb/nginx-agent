@@ -21,9 +21,9 @@ RUN set -ex &&  pip3 install --no-cache-dir --upgrade pip pycryptodomex watchdog
 
 WORKDIR /app
 # -- Adding Pipfiles
-ONBUILD COPY Pipfile Pipfile
-ONBUILD COPY Pipfile.lock Pipfile.lock
-ONBUILD RUN set -ex && pipenv install --deploy --system -v
+#ONBUILD COPY Pipfile Pipfile
+#ONBUILD COPY Pipfile.lock Pipfile.lock
+#ONBUILD RUN set -ex && pipenv install --deploy --system -v
 
 
 ### create the runtime image ###
