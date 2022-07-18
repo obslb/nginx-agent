@@ -1,6 +1,7 @@
-#!/usr/bin/env python3.8
+#!/usr/bin/env python3
 import argparse
 import asyncio
+import jinja2
 import json
 import logging
 import os
@@ -9,8 +10,6 @@ import sys
 import time
 import typing
 from signal import SIGTERM, SIGINT
-
-import jinja2
 
 from core.acme_auth_dns import acme_auth_check
 from version import VERSION
