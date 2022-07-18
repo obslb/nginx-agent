@@ -21,8 +21,8 @@ RUN set -ex &&  pip3 install --no-cache-dir --upgrade pip pipenv watchdog && mkd
 
 WORKDIR /app
 # -- Adding Pipfiles
-ONBUILD COPY src/Pipfile Pipfile
-ONBUILD COPY src/Pipfile.lock Pipfile.lock
+ONBUILD COPY Pipfile Pipfile
+ONBUILD COPY Pipfile.lock Pipfile.lock
 ONBUILD RUN set -ex && pipenv install --deploy --system
 
 
