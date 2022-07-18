@@ -17,7 +17,7 @@ ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 ENV PIP_NO_CACHE_DIR 0
 
-RUN set -ex &&  pip3 install --no-cache-dir --upgrade pip pipenv watchdog && mkdir -p /app
+RUN set -ex &&  pip3 install --no-cache-dir --upgrade pip pycryptodomex watchdog websockets tldextract redis jinja2 dnspython && mkdir -p /app
 
 WORKDIR /app
 # -- Adding Pipfiles
