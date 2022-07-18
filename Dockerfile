@@ -23,7 +23,7 @@ WORKDIR /app
 # -- Adding Pipfiles
 ONBUILD COPY Pipfile Pipfile
 ONBUILD COPY Pipfile.lock Pipfile.lock
-ONBUILD RUN set -ex && pipenv install --deploy --system
+ONBUILD RUN set -ex && pipenv install --deploy --system -v
 
 
 ### create the runtime image ###
